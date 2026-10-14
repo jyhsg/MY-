@@ -1,0 +1,72 @@
+{
+  "method": "Zhang planar calibration via OpenCV calibrateCamera",
+  "dataset_scope": "numbered subdirectories only; calibration_images.zip is a separate 1920x1080, 7x7-inner-corner dataset and is not mixed with this camera model",
+  "image_size": [
+    720,
+    576
+  ],
+  "pattern_inner_corners": [
+    6,
+    4
+  ],
+  "square_size": 1.0,
+  "square_unit_note": "physical square size absent; translations are in square-length units",
+  "selected_views_before_rejection": 38,
+  "all_detected_views_at_target_resolution": 126,
+  "selection_strategy": "sort candidates lexicographically by filename, then take 2 evenly spaced indices per numbered group",
+  "used_views": 38,
+  "rejected_views": [],
+  "rms_px": 1.852532985646517,
+  "mean_view_rmse_px": 1.6719439625740051,
+  "median_view_rmse_px": 1.6209703087806702,
+  "max_view_rmse_px": 3.7572357654571533,
+  "camera_matrix": [
+    [
+      234.86682454239957,
+      0.0,
+      330.28241321047227
+    ],
+    [
+      0.0,
+      258.31178004715224,
+      289.7627990621151
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "distortion_opencv_k1_k2_p1_p2_k3": [
+    -0.31512355070490106,
+    0.12247368842314005,
+    -0.004849783868421758,
+    0.007229668321901832,
+    -0.02378590145381437
+  ],
+  "flags": 0,
+  "sample_image_for_undistortion": "标定实验\\标定实验\\23\\74.jpg",
+  "new_camera_matrix_alpha_0_7": [
+    [
+      234.86682454239957,
+      0.0,
+      330.28241321047227
+    ],
+    [
+      0.0,
+      241.37545254007398,
+      280.89298005966657
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "valid_roi": [
+    0,
+    10,
+    719,
+    537
+  ]
+}

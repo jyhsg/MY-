@@ -1,0 +1,79 @@
+{
+  "method": "two orthogonal vanishing points from one chessboard image",
+  "dataset_scope": "numbered subdirectories only; calibration_images.zip is a separate 1920x1080, 7x7-inner-corner dataset",
+  "source_image": "标定实验\\标定实验\\19\\88.jpg",
+  "image_size": [
+    720,
+    576
+  ],
+  "assumptions": [
+    "principal point equals image center",
+    "zero skew",
+    "fx = fy",
+    "board axes are orthogonal"
+  ],
+  "vanishing_point_x": [
+    -2181.5654037812424,
+    264.6062726297493,
+    1.0
+  ],
+  "vanishing_point_y": [
+    406.96675430645735,
+    -411.0221158276603,
+    1.0
+  ],
+  "board_plane_vanishing_line_au_bv_c_eq_0": [
+    0.25254758307848035,
+    0.9675844760439359,
+    294.92014839218706
+  ],
+  "mean_line_concurrence_residual_px": 0.8125350049235578,
+  "candidate_selection": {
+    "accepted_focal_length_px": [
+      108.0,
+      1800.0
+    ],
+    "score": "mean_line_concurrence_residual_px + 0.0004 * (distance(vx, center) + distance(vy, center))"
+  },
+  "focal_length_px": 320.96159438434,
+  "camera_matrix": [
+    [
+      320.96159438434,
+      0.0,
+      360.0
+    ],
+    [
+      0.0,
+      320.96159438434,
+      288.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "rotation_world_board_axes_to_camera": [
+    [
+      -0.9920788098654154,
+      0.0609467644573706,
+      0.10984137161469995
+    ],
+    [
+      -0.009131545925698283,
+      -0.907091343077625,
+      0.4208347777722719
+    ],
+    [
+      0.1252846753798232,
+      0.416498243952851,
+      0.9004626382583366
+    ]
+  ],
+  "orthogonality_absolute_dot_error": 6.938893903907228e-18,
+  "unobservable": [
+    "translation",
+    "absolute scale"
+  ],
+  "warning": "raw image has strong radial distortion; this simplified pinhole estimate is expected to be biased"
+}
