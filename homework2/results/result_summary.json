@@ -1,0 +1,91 @@
+{
+  "coordinate_system": "origin top-left; x right; y down; pixels",
+  "image_size": [
+    1024,
+    685
+  ],
+  "vanishing_point_x": [
+    -726.9472704222069,
+    211.22479010521474
+  ],
+  "vanishing_point_y": [
+    1311.7126694772514,
+    226.35548471982779
+  ],
+  "vanishing_point_vertical": [
+    490.9065391690194,
+    7613.580105362545
+  ],
+  "vanishing_line_abc": [
+    -0.007421678134514338,
+    0.9999724589675796,
+    -216.61414141825983
+  ],
+  "vanishing_line_slope_intercept": {
+    "slope": 0.007421882540822015,
+    "intercept": 216.62010735965953
+  },
+  "reference_lamp_top": [
+    1006,
+    367
+  ],
+  "reference_lamp_base": [
+    997,
+    470
+  ],
+  "reference_lamp_top_corrected": [
+    1004.305633397217,
+    366.8799610496038
+  ],
+  "purple_arrow_lamp_top": [
+    293,
+    389
+  ],
+  "purple_arrow_lamp_reconstructed_base": [
+    296.34738259888167,
+    511.1962337902507
+  ],
+  "top_plane_direction_vp": [
+    4711.657641386825,
+    251.58947694659906
+  ],
+  "assumed_person_height_m": 1.7,
+  "estimated_lamp_height_m_median": 4.525774805997718,
+  "individual_estimate_range_m": [
+    4.34254564839996,
+    4.6690365689914834
+  ],
+  "height_interpretation": "Conditional estimate: people fixed at 1.70 m, common ground plane, equal-height lamp model.",
+  "diagnostics": {
+    "rms_angular_residual_deg": {
+      "x_direction": 0.24438464709681032,
+      "y_direction": 0.5388931504441299,
+      "vertical_direction": 0.166491019036941
+    },
+    "leave_one_out_horizon_y_at_image_center": {
+      "min": 218.64426628434418,
+      "max": 223.30892507735425,
+      "std": 1.0744334258683252
+    },
+    "affine_cross_check_height_m": 4.6143425735729515,
+    "finite_vp_minus_affine_m": -0.08856776757523388,
+    "reference_top_projection_shift_px": 1.698613415182716,
+    "pixel_perturbation": {
+      "trials": 2000,
+      "random_seed": 20261012,
+      "coordinate_noise_std_px": 1.0,
+      "fixed_person_height_m": 1.7,
+      "median_height_m": 4.484132451269433,
+      "height_std_m": 0.13195175635949993,
+      "height_percentiles_2.5_97.5_m": [
+        4.236829083573789,
+        4.76390476554763
+      ],
+      "horizon_y_at_512_percentiles_2.5_97.5_px": [
+        208.5783512631412,
+        231.5351490268522
+      ],
+      "interpretation": "Sensitivity under specified synthetic pixel error; not empirical confidence or total uncertainty."
+    }
+  }
+}
