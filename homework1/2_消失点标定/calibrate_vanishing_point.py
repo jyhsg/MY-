@@ -31,7 +31,8 @@ PATTERN = (6, 4)
 IMAGE_SIZE = (720, 576)
 FOCAL_MIN_WIDTH_RATIO = 0.15
 FOCAL_MAX_WIDTH_RATIO = 2.5
-VP_EXTENT_WEIGHT = 0.0004
+MAX_CONCURRENCE_RESIDUAL_PX = 2.0
+VP_MAX_EXTENT_WEIGHT = 0.0008
 
 
 def imread(path, flags=cv2.IMREAD_COLOR):
@@ -91,12 +92,17 @@ def detect_and_measure(path):
         return None
     residuals = [abs(line @ vx) for line in row_lines] + [abs(line @ vy) for line in col_lines]
     mean_residual = float(np.mean(residuals))
-    # Prefer low concurrence error and finite, visually comprehensible VPs.
-    vp_extent = float(np.linalg.norm(vx[:2] - center) + np.linalg.norm(vy[:2] - center))
-    score = mean_residual + VP_EXTENT_WEIGHT * vp_extent
+    if mean_residual > MAX_CONCURRENCE_RESIDUAL_PX:
+        return None
+    # Prefer low concurrence error while preventing either vanishing point
+    # from becoming so distant that the extended-coordinate plot is unreadable.
+    vp_distances = [np.linalg.norm(vx[:2] - center), np.linalg.norm(vy[:2] - center)]
+    max_vp_distance = float(max(vp_distances))
+    score = mean_residual + VP_MAX_EXTENT_WEIGHT * max_vp_distance
     return {
         "path": path, "corners": corners, "row_lines": row_lines, "col_lines": col_lines,
-        "vx": vx, "vy": vy, "f": f, "mean_residual": mean_residual, "score": score,
+        "vx": vx, "vy": vy, "f": f, "mean_residual": mean_residual,
+        "max_vp_distance": max_vp_distance, "score": score,
     }
 
 
@@ -141,20 +147,111 @@ def make_visualization(result):
         draw_infinite_line(overlay, line, (40, 210, 60))
     for point in result["corners"].reshape(-1, 2):
         cv2.circle(overlay, tuple(np.rint(point).astype(int)), 3, (255, 255, 255), -1, cv2.LINE_AA)
-    canvas = np.full((IMAGE_SIZE[1] + 118, IMAGE_SIZE[0], 3), 250, dtype=np.uint8)
-    canvas[:IMAGE_SIZE[1]] = cv2.addWeighted(image, 0.35, overlay, 0.65, 0)
+
     vx, vy = result["vx"], result["vy"]
     vanishing_line = np.cross(vx, vy)
     vanishing_line /= np.linalg.norm(vanishing_line[:2])
+
+    # The two vanishing points are outside the source image.  Keep the source
+    # view at full resolution and add a coordinate overview that contains the
+    # image rectangle, principal point, both vanishing points, and their line.
+    image_w, image_h = IMAGE_SIZE
+    overview_w = 600
+    footer_h = 150
+    canvas = np.full((image_h + footer_h, image_w + overview_w, 3), 250, dtype=np.uint8)
+    canvas[:image_h, :image_w] = cv2.addWeighted(image, 0.35, overlay, 0.65, 0)
+    canvas[:image_h, image_w:] = (246, 246, 246)
+
+    world_points = np.array([
+        [0.0, 0.0],
+        [float(image_w), float(image_h)],
+        vx[:2],
+        vy[:2],
+    ])
+    world_min = world_points.min(axis=0)
+    world_max = world_points.max(axis=0)
+    world_span = np.maximum(world_max - world_min, 1.0)
+    world_min -= 0.08 * world_span
+    world_max += 0.08 * world_span
+    world_span = world_max - world_min
+
+    panel_left = image_w
+    panel_top = 68
+    panel_padding = 42
+    available_w = overview_w - 2 * panel_padding
+    available_h = image_h - panel_top - panel_padding
+    scale = min(available_w / world_span[0], available_h / world_span[1])
+    drawing_w, drawing_h = world_span * scale
+    offset_x = panel_left + (overview_w - drawing_w) / 2.0
+    offset_y = panel_top + (available_h - drawing_h) / 2.0
+
+    def map_world(point):
+        mapped = (np.asarray(point, dtype=float) - world_min) * scale
+        return tuple(np.rint(mapped + [offset_x, offset_y]).astype(int))
+
+    cv2.putText(canvas, "Extended image-coordinate view", (panel_left + 22, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.72, (30, 30, 30), 2, cv2.LINE_AA)
+    cv2.putText(canvas, "Vanishing points are outside the 720 x 576 image", (panel_left + 22, 55),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.46, (75, 75, 75), 1, cv2.LINE_AA)
+
+    # Coordinate axes, image boundary, and the board-plane vanishing line.
+    axis_color = (195, 195, 195)
+    if world_min[0] <= 0 <= world_max[0]:
+        cv2.line(canvas, map_world((0, world_min[1])), map_world((0, world_max[1])),
+                 axis_color, 1, cv2.LINE_AA)
+    if world_min[1] <= 0 <= world_max[1]:
+        cv2.line(canvas, map_world((world_min[0], 0)), map_world((world_max[0], 0)),
+                 axis_color, 1, cv2.LINE_AA)
+
+    image_tl = map_world((0, 0))
+    image_br = map_world((image_w, image_h))
+    cv2.rectangle(canvas, image_tl, image_br, (225, 235, 248), -1)
+    cv2.rectangle(canvas, image_tl, image_br, (70, 95, 125), 2, cv2.LINE_AA)
+    cv2.putText(canvas, "source image", (image_tl[0] + 5, image_tl[1] + 18),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.43, (55, 70, 90), 1, cv2.LINE_AA)
+
+    mapped_vx = map_world(vx[:2])
+    mapped_vy = map_world(vy[:2])
+    mapped_center = map_world((image_w / 2.0, image_h / 2.0))
+    cv2.line(canvas, mapped_vx, mapped_vy, (180, 70, 150), 2, cv2.LINE_AA)
+    cv2.arrowedLine(canvas, mapped_center, mapped_vx, (30, 60, 240), 1,
+                    cv2.LINE_AA, tipLength=0.025)
+    cv2.arrowedLine(canvas, mapped_center, mapped_vy, (40, 180, 50), 1,
+                    cv2.LINE_AA, tipLength=0.025)
+
+    cv2.drawMarker(canvas, mapped_center, (20, 20, 20), cv2.MARKER_CROSS, 12, 2, cv2.LINE_AA)
+    cv2.circle(canvas, mapped_vx, 8, (255, 255, 255), -1, cv2.LINE_AA)
+    cv2.circle(canvas, mapped_vx, 6, (30, 60, 240), -1, cv2.LINE_AA)
+    cv2.circle(canvas, mapped_vy, 8, (255, 255, 255), -1, cv2.LINE_AA)
+    cv2.circle(canvas, mapped_vy, 6, (40, 180, 50), -1, cv2.LINE_AA)
+    def put_vp_label(text, point, color):
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.49
+        (text_w, text_h), _ = cv2.getTextSize(text, font, font_scale, 1)
+        x = point[0] + 10
+        y = point[1] - 10
+        if x + text_w > canvas.shape[1] - 8:
+            x = point[0] - text_w - 10
+            y = point[1] + text_h + 10
+        if y - text_h < 8:
+            y = point[1] + text_h + 10
+        cv2.putText(canvas, text, (x, y), font, font_scale, color, 1, cv2.LINE_AA)
+
+    put_vp_label(f"VP_x ({vx[0]:.1f}, {vx[1]:.1f})", mapped_vx, (30, 60, 210))
+    put_vp_label(f"VP_y ({vy[0]:.1f}, {vy[1]:.1f})", mapped_vy, (30, 145, 40))
+    cv2.putText(canvas, "principal point", (mapped_center[0] + 8, mapped_center[1] + 18),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.42, (20, 20, 20), 1, cv2.LINE_AA)
+
     lines = [
         "Red/green: two orthogonal families of parallel board lines",
-        f"VP_x=({vx[0]:.1f}, {vx[1]:.1f}), VP_y=({vy[0]:.1f}, {vy[1]:.1f})",
+        f"VP_x=({vx[0]:.1f}, {vx[1]:.1f}), VP_y=({vy[0]:.1f}, {vy[1]:.1f})  [both outside source image]",
         f"Board vanishing line: {vanishing_line[0]:.4f}u + {vanishing_line[1]:.4f}v + {vanishing_line[2]:.2f}=0",
-        f"Assume principal point=image center, skew=0, fx=fy:  f={result['f']:.2f} px",
+        f"f={result['f']:.2f} px, mean line-concurrence residual={result['mean_residual']:.3f} px",
+        f"K=[[{result['f']:.2f}, 0, {image_w / 2:.0f}], [0, {result['f']:.2f}, {image_h / 2:.0f}], [0, 0, 1]]; skew=0, fx=fy",
     ]
     for i, text in enumerate(lines):
-        cv2.putText(canvas, text, (10, IMAGE_SIZE[1] + 24 + i * 25),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.53, (20, 20, 20), 1, cv2.LINE_AA)
+        cv2.putText(canvas, text, (12, image_h + 25 + i * 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.57, (20, 20, 20), 1, cv2.LINE_AA)
     imwrite(OUT / "单张消失线标定图.jpg", canvas)
 
 
@@ -195,7 +292,9 @@ def main():
                 FOCAL_MIN_WIDTH_RATIO * IMAGE_SIZE[0],
                 FOCAL_MAX_WIDTH_RATIO * IMAGE_SIZE[0],
             ],
-            "score": "mean_line_concurrence_residual_px + 0.0004 * (distance(vx, center) + distance(vy, center))",
+            "maximum_mean_line_concurrence_residual_px": MAX_CONCURRENCE_RESIDUAL_PX,
+            "score": "mean_line_concurrence_residual_px + 0.0008 * max(distance(vx, center), distance(vy, center))",
+            "max_vanishing_point_distance_px": result["max_vp_distance"],
         },
         "focal_length_px": result["f"],
         "camera_matrix": K.tolist(),

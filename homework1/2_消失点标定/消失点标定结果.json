@@ -1,7 +1,7 @@
 {
   "method": "two orthogonal vanishing points from one chessboard image",
   "dataset_scope": "numbered subdirectories only; calibration_images.zip is a separate 1920x1080, 7x7-inner-corner dataset",
-  "source_image": "标定实验\\标定实验\\19\\88.jpg",
+  "source_image": "单张消失线原始图片\\10\\15.jpg",
   "image_size": [
     720,
     576
@@ -13,38 +13,40 @@
     "board axes are orthogonal"
   ],
   "vanishing_point_x": [
-    -2181.5654037812424,
-    264.6062726297493,
+    1386.587466623556,
+    240.22045612389925,
     1.0
   ],
   "vanishing_point_y": [
-    406.96675430645735,
-    -411.0221158276603,
+    300.43665739612294,
+    -137.23298479464617,
     1.0
   ],
   "board_plane_vanishing_line_au_bv_c_eq_0": [
-    0.25254758307848035,
-    0.9675844760439359,
-    294.92014839218706
+    0.32825827734158286,
+    -0.9445880072056475,
+    -228.24945123717234
   ],
-  "mean_line_concurrence_residual_px": 0.8125350049235578,
+  "mean_line_concurrence_residual_px": 1.6623463991724066,
   "candidate_selection": {
     "accepted_focal_length_px": [
       108.0,
       1800.0
     ],
-    "score": "mean_line_concurrence_residual_px + 0.0004 * (distance(vx, center) + distance(vy, center))"
+    "maximum_mean_line_concurrence_residual_px": 2.0,
+    "score": "mean_line_concurrence_residual_px + 0.0008 * max(distance(vx, center), distance(vy, center))",
+    "max_vanishing_point_distance_px": 1027.6987454704706
   },
-  "focal_length_px": 320.96159438434,
+  "focal_length_px": 202.06321518966286,
   "camera_matrix": [
     [
-      320.96159438434,
+      202.06321518966286,
       0.0,
       360.0
     ],
     [
       0.0,
-      320.96159438434,
+      202.06321518966286,
       288.0
     ],
     [
@@ -55,22 +57,22 @@
   ],
   "rotation_world_board_axes_to_camera": [
     [
-      -0.9920788098654154,
-      0.0609467644573706,
-      0.10984137161469995
+      0.980152791862021,
+      -0.1255146610967751,
+      0.15344893109711588
     ],
     [
-      -0.009131545925698283,
-      -0.907091343077625,
-      0.4208347777722719
+      -0.04561837626761796,
+      -0.8960708321664275,
+      -0.4415608989564998
     ],
     [
-      0.1252846753798232,
-      0.416498243952851,
-      0.9004626382583366
+      0.19292347796935386,
+      0.425797056812665,
+      -0.8840121028910636
     ]
   ],
-  "orthogonality_absolute_dot_error": 6.938893903907228e-18,
+  "orthogonality_absolute_dot_error": 2.7755575615628914e-17,
   "unobservable": [
     "translation",
     "absolute scale"
