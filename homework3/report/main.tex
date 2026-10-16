@@ -1,0 +1,185 @@
+% Compile twice with XeLaTeX from the report directory.
+\documentclass[UTF8,a4paper,zihao=-4,fontset=windows]{ctexart}
+\usepackage[left=2.35cm,right=2.35cm,top=2.55cm,bottom=2.3cm,headheight=17pt,headsep=0.7cm]{geometry}
+\usepackage{amsmath,amssymb,booktabs,array,graphicx,float,fancyhdr,xcolor}
+\usepackage[font=small,labelfont=bf,labelsep=quad]{caption}
+\usepackage{enumitem}
+\usepackage[unicode,hidelinks]{hyperref}
+\setmainfont{Times New Roman}
+\setlength{\parindent}{2em}
+\linespread{1.16}
+\setlist{nosep,leftmargin=2em,topsep=4pt}
+\ctexset{section={format=\large\bfseries,beforeskip=12pt,afterskip=6pt}}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\songti\zihao{-4}机器视觉}
+\fancyhead[C]{\songti\zihao{-4}实验结果}
+\fancyhead[R]{\normalfont\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyhead[L]{机器视觉}\fancyhead[C]{实验结果}\fancyhead[R]{\thepage}\renewcommand{\headrulewidth}{0.4pt}}
+\hypersetup{pdftitle={对极几何实践作业：基础矩阵估计与自动匹配},pdfsubject={两个必做实验}}
+\input{results.tex}
+\newcommand{\fig}[3]{\begin{figure}[H]\centering\includegraphics[width=#2\linewidth]{#1}\caption{#3}\end{figure}}
+
+\begin{document}
+\begin{center}
+{\LARGE\bfseries 对极几何实践作业}\\[7pt]
+{\large 基础矩阵估计、极线绘制与自动特征匹配}\\[5pt]
+\end{center}
+\vspace{3pt}
+
+\phantomsection
+\addcontentsline{toc}{section}{摘要}
+\begin{abstract}
+采用归一化八点法估计房屋模型双视图的基础矩阵，并计算极点、绘制极线。首先根据给定的 168 对匹配点求解基础矩阵，通过 SVD 施加秩 2 约束；随后采用 SIFT 特征提取、双向匹配筛选及 RANSAC 外点剔除，完成自动匹配与基础矩阵估计。给定匹配点的平均 Sampson 距离为 $\GivenMean\,\mathrm{px}^2$，左右平均点线距离约为 0.21 px。自动匹配经筛选获得 $\NumMutual$ 对点，RANSAC 保留 $\NumAutoInliers$ 对、剔除 $\NumAutoOutliers$ 对，最终内点集的平均 Sampson 距离为 $\AutoMean\,\mathrm{px}^2$。实验获得了两个任务对应的基础矩阵与极线结果。
+
+\medskip
+\noindent\textbf{关键词：}对极几何；基础矩阵；归一化八点法；SIFT；RANSAC
+\end{abstract}
+
+\setcounter{tocdepth}{2}
+\begingroup
+\ctexset{section/format=\centering\large\bfseries}
+\tableofcontents
+\endgroup
+\clearpage
+
+\section{实验目的与数据}
+本实验完成两个任务：利用给定匹配点估计基础矩阵 $F$，在左右视图中绘制红色极点和蓝色极线；实现 SIFT 特征检测、描述子匹配及 RANSAC 外点处理，并根据自动匹配点估计 $F$。
+
+实验数据为同一房屋模型的左右视图及 168 对匹配点。采用作业文档内嵌的 $384\times288$ 图像进行计算。另附 JPG 为约 $134\times100$ 的缩略图，其尺寸与给定匹配点的坐标范围不一致，未用于估计。
+
+\begin{table}[H]\centering\caption{输入数据核查结果}
+\begin{tabular}{lcc}\toprule
+项目 & 左视图 & 右视图\\\midrule
+原图尺寸（宽 $\times$ 高） & $384\times288$ & $384\times288$\\
+匹配点数 & 168 & 168\\
+横坐标范围 / px & $[11.154,367.939]$ & $[12.461,368.146]$\\
+纵坐标范围 / px & $[44.144,265.922]$ & $[44.059,274.160]$\\\bottomrule
+\end{tabular}\end{table}
+
+匹配点文件第 1、3 列的最大值超过图像高度 288，但均小于宽度 384。结合点位可视化，四列按 $(x_L,y_L,x_R,y_R)$ 解释，即横坐标、纵坐标，而非作业说明中的行、列顺序。计算保留文件中的坐标值，未附加像素原点偏移。
+
+\section{实验环境与符号定义}
+实验使用 Python 3.13.5、NumPy 2.1.3、OpenCV 4.10.0 和 Matplotlib 3.10.0。随机种子设为 42，OpenCV 使用单线程。左右图像点的齐次坐标分别记为 $x_L=(u,v,1)^T$、$x_R=(u',v',1)^T$，对极约束及对应极线定义为
+\begin{equation}
+x_R^T F x_L=0,\qquad l_R=Fx_L,\qquad l_L=F^T x_R.
+\end{equation}
+其中 $l_L$ 和 $l_R$ 分别为左、右图像中的对应极线。基础矩阵估计与 RANSAC 采用 NumPy 实现，OpenCV 用于 SIFT 特征提取和描述子匹配。
+
+\clearpage
+\section{基础矩阵估计方法}
+\subsection{Hartley 归一化与八点法}
+对左右点集分别平移至质心为零，再缩放使点到原点的平均欧氏距离为 $\sqrt{2}$，得到变换 $T_L,T_R$ 和归一化点 $\widetilde{x}_L=T_Lx_L$、$\widetilde{x}_R=T_Rx_R$。与标定中的 $K^{-1}x$ 不同，这里的归一化只用于改善数值条件，不要求已知内参。
+
+将 $\widetilde{x}_R^T\widetilde{F}\widetilde{x}_L=0$ 按行展开，每对点对设计矩阵 $A$ 贡献一行：
+\begin{equation}
+A_i=[u'u,\ u'v,\ u',\ v'u,\ v'v,\ v',\ u,\ v,\ 1].
+\end{equation}
+对 $A=U_A\Sigma_A V_A^T$ 进行 SVD，取 $V_A$ 最后一列，按行优先顺序重排成 $3\times3$ 初始矩阵 $F_0$。最小样本时 $A$ 为 $8\times9$，必须保留完整的 $V_A^T$；若使用缩减 SVD，会丢掉所需的零空间向量。
+
+带噪声的 $F_0$ 通常满秩。再次分解并将最小奇异值置零：
+\begin{equation}
+F_0=U\operatorname{diag}(s_1,s_2,s_3)V^T,
+\quad \widetilde{F}=U\operatorname{diag}(s_1,s_2,0)V^T.
+\end{equation}
+反归一化得到
+\begin{equation}
+F=T_R^T\widetilde{F}T_L.
+\end{equation}
+由于基础矩阵仅确定到非零尺度，结果统一归一化为 $\lVert F\rVert_F=1$，并令绝对值最大的元素为正。
+
+\subsection{评价指标与外点判据}
+本文使用 Sampson 距离作为一阶几何误差近似：
+\begin{equation}
+d_S=\frac{(x_R^TFx_L)^2}
+{(Fx_L)_1^2+(Fx_L)_2^2+(F^Tx_R)_1^2+(F^Tx_R)_2^2}.
+\end{equation}
+$d_S$ 的单位为像素平方，$\sqrt{d_S}$ 的单位为像素。RANSAC 以 $\sqrt{d_S}\leq1.5$ 判为内点，等价于 $d_S\leq2.25$。另计算左右图点到对应极线的垂直距离：
+\begin{equation}
+d_L=\frac{|x_R^TFx_L|}{\sqrt{(F^Tx_R)_1^2+(F^Tx_R)_2^2}},\qquad
+d_R=\frac{|x_R^TFx_L|}{\sqrt{(Fx_L)_1^2+(Fx_L)_2^2}}.
+\end{equation}
+通过 Sampson 距离和点线距离检查估计结果与匹配点的几何一致性，并利用最小奇异值和极点零空间残差检查代数约束。
+
+\subsection{极线和极点绘制}
+左极点满足 $Fe_L=0$，右极点满足 $F^Te_R=0$，可由 SVD 的零空间求得。对直线 $au+bv+c=0$，分别与图像四条边求交并裁剪，避免垂直极线中除以接近零的 $b$。有限极点按第三分量归一化；图外极点通过扩展坐标图展示，不将其移动到图像边界。
+
+\clearpage
+\section{实验一：给定匹配点估计结果}
+使用全部 168 对点进行归一化八点法估计，得到基础矩阵
+\begin{equation}
+F_{\mathrm{given}}\approx\GivenF.
+\end{equation}
+其奇异值约为 $(0.888096,\ 0.459657,\ 2.10\times10^{-18})$，符合秩 2 约束。左右极点分别为
+\begin{align}
+e_L&=(\GivenLeftEp)^T,\\
+e_R&=(\GivenRightEp)^T.
+\end{align}
+两个极点均在图像范围之外，图内极线近似平行。采用统一的相对零空间残差 $\lVert Fe_L\rVert/\lVert e_L\rVert$ 和 $\lVert F^Te_R\rVert/\lVert e_R\rVert$，分别约为 $3.30\times10^{-18}$ 和 $5.86\times10^{-17}$。
+
+给定点的 Sampson 均值为 $\GivenMean\,\mathrm{px}^2$，左右平均点线距离分别为 $\GivenLeftDist$ px 和 $\GivenRightDist$ px。
+
+图中选取 16 对匹配点展示，蓝线为极线，黄色标记为匹配点；左右相同编号表示对应关系。
+
+\fig{../outputs/given_matches/epilines.png}{1}{给定匹配点的极线}
+
+\clearpage
+将左右视图分别扩展至包含极点的坐标范围。红点为极点，蓝线为对应极线，各图横纵坐标保持等比例。
+
+\fig{../outputs/given_matches/epipole_left.png}{0.95}{左视图极点与极线}
+
+\fig{../outputs/given_matches/epipole_right.png}{0.95}{右视图极点与极线}
+
+\clearpage
+\section{实验二：自动特征检测与匹配}
+对两幅图像提取 SIFT 特征，依次进行 KNN 匹配、Lowe 比率检验和双向一致性筛选，再采用 RANSAC 估计基础矩阵，最后利用一致集重新拟合。
+
+SIFT 设置最大特征数 3000、对比度阈值 0.02，其余采用 OpenCV 默认参数。使用 L2 距离进行 KNN 匹配，$k=2$，要求最近距离小于次近距离的 0.75 倍。反向匹配也独立进行比率检验，仅保留左右互为匹配的点对。
+
+RANSAC 每次无放回抽取 8 对点，剔除退化样本后按 Sampson 阈值统计内点。以内点数量作为主要评分；内点数相同时，选择截断误差和较小的模型。对更新后的最优模型，最多进行 5 次局部内点重估。置信度设为 0.999，最大采样次数为 10000，并根据内点比例 $w$ 更新所需采样次数：
+\begin{equation}
+N=\left\lceil\frac{\log(1-0.999)}{\log(1-w^8)}\right\rceil.
+\end{equation}
+对最优一致集重新拟合后，依据最终模型确定内点。表中的迭代数为随机采样次数，不包含局部重估。
+
+\begin{table}[H]\centering\caption{自动流程中的点数变化与参数}
+\begin{tabular}{lr@{\qquad}lr}\toprule
+项目 & 数值 & 项目 & 数值\\\midrule
+左图 SIFT 点 & \NumLeftKeys & 右图 SIFT 点 & \NumRightKeys\\
+正向比率通过 & \NumRatio & 双向一致匹配 & \NumMutual\\
+RANSAC 内点 & \NumAutoInliers & RANSAC 外点 & \NumAutoOutliers\\
+内点率 & \AutoInlierPercent\% & 实际采样次数 & \AutoIterations\\\bottomrule
+\end{tabular}\end{table}
+
+绿色连线表示内点，红色连线表示外点。
+
+\fig{../outputs/automatic_matching/ransac_matches.png}{1}{自动匹配的内外点分类}
+
+\clearpage
+\section{实验二：基础矩阵与误差分析}
+自动匹配估计结果为
+\begin{equation}
+F_{\mathrm{auto}}\approx\AutoF.
+\end{equation}
+最小奇异值约为 $4.76\times10^{-18}$。最终内点集上的 Sampson 均值为 $\AutoMean\,\mathrm{px}^2$，中位数为 $\AutoMedian\,\mathrm{px}^2$，左右平均点线距离分别为 $\AutoLeftDist$ px 和 $\AutoRightDist$ px。
+
+\fig{../outputs/automatic_matching/epilines.png}{1}{自动匹配点的极线}
+
+自动流程的基础矩阵由 RANSAC 一致集重新估计得到；其内点判断基于像素几何约束。由于原始数据没有人工匹配真值，内点率反映的是所设阈值下的几何一致性。
+
+\section{结论}
+根据给定的 168 对匹配点完成了基础矩阵估计，并绘制了左右视图的蓝色极线和红色极点，左右平均点线距离分别为 $\GivenLeftDist$ px 和 $\GivenRightDist$ px。自动流程完成 SIFT 特征检测、双向匹配和 RANSAC 外点处理，获得 $\NumAutoInliers$ 对内点，剔除 $\NumAutoOutliers$ 对外点，内点率为 $\AutoInlierPercent\%$；所得基础矩阵在内点集上的左右平均点线距离分别为 $\AutoLeftDist$ px 和 $\AutoRightDist$ px。
+
+\begingroup
+\small
+\renewcommand{\refname}{参考文献}
+\phantomsection
+\addcontentsline{toc}{section}{参考文献}
+\begin{thebibliography}{9}
+\bibitem{course} 《机器视觉》课程组. 对极几何：课程讲义与实践作业说明.
+\bibitem{hartley} Hartley R, Zisserman A. Multiple View Geometry in Computer Vision. 2nd ed. Cambridge University Press, 2003.
+\end{thebibliography}
+\endgroup
+\end{document}
